@@ -1,5 +1,5 @@
-// Lógica del frontend (se completará en el siguiente paso)
 
+(function() {
 // ===== Configuración base =====
 const API_URL = 'http://localhost:3000/api';
 
@@ -33,10 +33,40 @@ async function register(nombre, email, password, passwordConfirm) {
 // ===== Funciones para categorías =====
 async function getCategories() {
     try {
-        const response = await fetch(`${API_URL}/categorias`);
+        const response = await fetch(`${API_URL}/categorias`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
         return await response.json();
     } catch (error) {
         console.error('Error al obtener categorías:', error);
+    }
+}
+
+// ===== Renderizar selector de categorías =====
+async function renderCategorySelector() {
+    const select = document.querySelector('select[name="categoria_id"]');
+    if (!select) return;
+    select.innerHTML = '<option value="">Categoría</option>';
+    const data = await getCategories();
+    if (data && data.categorias) {
+        data.categorias.forEach(cat => {
+            const option = document.createElement('option');
+            option.value = cat.id;
+            option.textContent = `${cat.nombre} (${cat.tipo})`;
+            select.appendChild(option);
+        });
+    }
+}
+
+// ===== Función para listar transacciones =====
+async function getTransactions() {
+    try {
+        const response = await fetch(`${API_URL}/transacciones`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        return await response.json();
+    } catch (error) {
+        console.error('Error al obtener transacciones:', error);
     }
 }
 
@@ -117,10 +147,34 @@ async function handleTransaction(event) {
         alert(`Error: ${response.error}`);
     } else {
         alert('Transacción registrada con éxito.');
-        // Actualizar historial o resumen mensual
-        window.location.reload();
+            await renderTransactions();
     }
 }
+
+    // ===== Renderizar transacciones en el dashboard =====
+    async function renderTransactions() {
+        const tbody = document.querySelector('#transacciones-list');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+        const data = await getTransactions();
+        if (data && data.transacciones) {
+            // Obtener categorías para mostrar nombre
+            const catData = await getCategories();
+            const categorias = catData && catData.categorias ? catData.categorias : [];
+            data.transacciones.forEach(tx => {
+                const tr = document.createElement('tr');
+                const cat = categorias.find(c => c.id === tx.categoria_id);
+                tr.innerHTML = `
+                    <td>${tx.fecha}</td>
+                    <td>${tx.tipo}</td>
+                    <td>${cat ? cat.nombre : tx.categoria_id}</td>
+                    <td>$${tx.monto}</td>
+                    <td>${tx.nota || ''}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    }
 
 // ===== Asociar eventos a los formularios =====
 const registerForm = document.querySelector('#registro-form');
@@ -143,4 +197,7 @@ if (logoutButton) {
 const transactionForm = document.querySelector('#transaction-form');
 if (transactionForm) {
     transactionForm.addEventListener('submit', handleTransaction);
+    renderTransactions();
+    renderCategorySelector();
 }
+})();
